@@ -211,7 +211,7 @@ def download():
                 "quiet": True,
             }
             if cookies_file:
-                ydl_opts["cookiefile"] = cookies_file
+                cmd += ["--yt-dlp-args", f"--cookies {cookies_file}"]
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
