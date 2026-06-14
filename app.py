@@ -214,9 +214,9 @@ def download():
 
             # find the file spotdl created
             files = [f for f in os.listdir("/tmp") if f.startswith(out_id) and f.endswith(".mp3")]
-            if not files:
-                error_msg = result.stderr.strip() or result.stdout.strip() or "Download failed."
-                return render_template_string(HTML, error=error_msg, url=url)
+          if not files:
+              error_msg = f"STDOUT: {result.stdout.strip()} | STDERR: {result.stderr.strip()}"
+              return render_template_string(HTML, error=error_msg, url=url)
 
             mp3_path = f"/tmp/{files[0]}"
             title = files[0].replace(f"{out_id}.", "").replace(".mp3", "")
