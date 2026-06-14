@@ -2,6 +2,7 @@ from flask import Flask, request, send_file, render_template_string
 import yt_dlp
 import os
 import uuid
+import subprocess
 
 app = Flask(__name__)
 
@@ -11,7 +12,7 @@ HTML = """
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tokito MP3 Downloader</title>
+  <title>MP3 Downloader</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -145,7 +146,7 @@ HTML = """
       </svg>
     </div>
 
-    <h1>Tokito MP3 Downloader</h1>
+    <h1>MP3 Downloader</h1>
     <p class="sub">Paste a YouTube or Spotify link to download as MP3.</p>
 
     <form method="POST" action="/download" onsubmit="handleSubmit(this)">
@@ -154,7 +155,7 @@ HTML = """
         type="text"
         id="url"
         name="url"
-        placeholder="https://youtube.com/watch?v=..."
+        placeholder="https://youtube.com/watch?v=... or Spotify link"
         value="{{ url or '' }}"
         required
         autocomplete="off"
@@ -166,7 +167,7 @@ HTML = """
     <div class="message error">⚠ {{ error }}</div>
     {% endif %}
 
-    <p class="supported">Works with <span>YouTube · SoundCloud · and 1000+ sites</span></p>
+    <p class="supported">Works with <span>YouTube · Spotify · SoundCloud · and 1000+ sites</span></p>
   </div>
 
   <script>
@@ -195,24 +196,49 @@ def download():
         return render_template_string(HTML, error="Please enter a URL.", url=url)
 
     out_id = str(uuid.uuid4())
-    out_template = f"/tmp/{out_id}.%(ext)s"
-    mp3_path = f"/tmp/{out_id}.mp3"
-
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": out_template,
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": AUDIO_QUALITY,
-        }],
-        "quiet": True,
-    }
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            title = info.get("title", "audio")
+        if "spotify.com" in url:
+            # ── Spotify: use spotdl ──────────────────────────
+            result = subprocess.run(
+                [
+                    "spotdl", url,
+                    "--output", f"/tmp/{out_id}.{{title}}.mp3",
+                    "--format", "mp3",
+                    "--bitrate", "320k",
+                ],
+                capture_output=True,
+                text=True
+            )
+
+            # find the file spotdl created
+            files = [f for f in os.listdir("/tmp") if f.startswith(out_id) and f.endswith(".mp3")]
+            if not files:
+                error_msg = result.stderr.strip() or result.stdout.strip() or "Download failed."
+                return render_template_string(HTML, error=error_msg, url=url)
+
+            mp3_path = f"/tmp/{files[0]}"
+            title = files[0].replace(f"{out_id}.", "").replace(".mp3", "")
+
+        else:
+            # ── YouTube / SoundCloud / everything else: use yt-dlp ──
+            out_template = f"/tmp/{out_id}.%(ext)s"
+            mp3_path = f"/tmp/{out_id}.mp3"
+
+            ydl_opts = {
+                "format": "bestaudio/best",
+                "outtmpl": out_template,
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": AUDIO_QUALITY,
+                }],
+                "quiet": True,
+            }
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                title = info.get("title", "audio")
 
         return send_file(
             mp3_path,
@@ -220,6 +246,7 @@ def download():
             download_name=f"{title}.mp3",
             mimetype="audio/mpeg"
         )
+
     except Exception as e:
         return render_template_string(HTML, error=str(e), url=url)
 
