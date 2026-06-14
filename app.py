@@ -150,10 +150,11 @@ AUDIO_QUALITY = "320"
 # ─────────────────────────────────────────────────────────
 
 def write_cookies_file():
-    """Write YouTube cookies from environment variable to a temp file."""
     cookies = os.environ.get("YOUTUBE_COOKIES", "")
     if not cookies:
         return None
+    # fix line breaks in case env variable squished them
+    cookies = cookies.replace("\\n", "\n")
     tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
     tmp.write(cookies)
     tmp.close()
