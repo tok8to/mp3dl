@@ -202,12 +202,11 @@ def download():
             # ── Spotify: use spotdl ──────────────────────────
             result = subprocess.run(
                 [
-                    "spotdl", url,
-                    "--output", f"/tmp/{out_id}.{{title}}.mp3",
-                    "--format", "mp3",
-                    "--bitrate", "320k",
-                    "--audio", "youtube",
-                    "--lyrics-provider", "genius",
+                "spotdl", url,
+                "--output", f"/tmp/{out_id}.{{title}}.mp3",
+                "--format", "mp3",
+                "--bitrate", "320k",
+                "--audio", "youtube",
                 ],
                 capture_output=True,
                 text=True
