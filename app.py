@@ -3,6 +3,7 @@ import yt_dlp
 import os
 import uuid
 import subprocess
+import tempfile
 
 app = Flask(__name__)
 
@@ -17,7 +18,6 @@ HTML = """
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: 'Inter', sans-serif;
       background: #0f0f0f;
@@ -28,7 +28,6 @@ HTML = """
       justify-content: center;
       padding: 2rem;
     }
-
     .card {
       background: #1a1a1a;
       border: 1px solid #2a2a2a;
@@ -37,7 +36,6 @@ HTML = """
       width: 100%;
       max-width: 480px;
     }
-
     .icon {
       width: 48px;
       height: 48px;
@@ -48,26 +46,9 @@ HTML = """
       justify-content: center;
       margin-bottom: 1.5rem;
     }
-
-    .icon svg {
-      width: 24px;
-      height: 24px;
-      fill: #000;
-    }
-
-    h1 {
-      font-size: 1.4rem;
-      font-weight: 600;
-      color: #fff;
-      margin-bottom: 0.4rem;
-    }
-
-    p.sub {
-      font-size: 0.875rem;
-      color: #666;
-      margin-bottom: 2rem;
-    }
-
+    .icon svg { width: 24px; height: 24px; fill: #000; }
+    h1 { font-size: 1.4rem; font-weight: 600; color: #fff; margin-bottom: 0.4rem; }
+    p.sub { font-size: 0.875rem; color: #666; margin-bottom: 2rem; }
     label {
       display: block;
       font-size: 0.8rem;
@@ -77,7 +58,6 @@ HTML = """
       letter-spacing: 0.05em;
       margin-bottom: 0.5rem;
     }
-
     input[type="text"] {
       width: 100%;
       background: #111;
@@ -91,10 +71,8 @@ HTML = """
       transition: border-color 0.15s;
       margin-bottom: 1.25rem;
     }
-
     input[type="text"]:focus { border-color: #1db954; }
     input[type="text"]::placeholder { color: #444; }
-
     button {
       width: 100%;
       background: #1db954;
@@ -108,24 +86,16 @@ HTML = """
       cursor: pointer;
       transition: background 0.15s, transform 0.1s;
     }
-
     button:hover { background: #1ed760; }
     button:active { transform: scale(0.98); }
     button:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; }
-
     .message {
       margin-top: 1.25rem;
       border-radius: 10px;
       padding: 0.85rem 1rem;
       font-size: 0.85rem;
     }
-
-    .message.error {
-      background: #2a1010;
-      border: 1px solid #5a1a1a;
-      color: #ff6b6b;
-    }
-
+    .message.error { background: #2a1010; border: 1px solid #5a1a1a; color: #ff6b6b; }
     .supported {
       margin-top: 1.5rem;
       padding-top: 1.5rem;
@@ -134,7 +104,6 @@ HTML = """
       color: #444;
       text-align: center;
     }
-
     .supported span { color: #555; }
   </style>
 </head>
@@ -145,10 +114,8 @@ HTML = """
         <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
       </svg>
     </div>
-
     <h1>MP3 Downloader</h1>
     <p class="sub">Paste a YouTube or Spotify link to download as MP3.</p>
-
     <form method="POST" action="/download" onsubmit="handleSubmit(this)">
       <label for="url">Song URL</label>
       <input
@@ -162,14 +129,11 @@ HTML = """
       >
       <button type="submit" id="btn">Download MP3</button>
     </form>
-
     {% if error %}
     <div class="message error">⚠ {{ error }}</div>
     {% endif %}
-
     <p class="supported">Works with <span>YouTube · Spotify · SoundCloud · and 1000+ sites</span></p>
   </div>
-
   <script>
     function handleSubmit(form) {
       const btn = document.getElementById('btn');
@@ -182,8 +146,18 @@ HTML = """
 """
 
 # ── config ────────────────────────────────────────────────
-AUDIO_QUALITY = "320"   # max MP3 quality
+AUDIO_QUALITY = "320"
 # ─────────────────────────────────────────────────────────
+
+def write_cookies_file():
+    """Write YouTube cookies from environment variable to a temp file."""
+    cookies = os.environ.get("YOUTUBE_COOKIES", "")
+    if not cookies:
+        return None
+    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
+    tmp.write(cookies)
+    tmp.close()
+    return tmp.name
 
 @app.route("/")
 def index():
@@ -196,26 +170,26 @@ def download():
         return render_template_string(HTML, error="Please enter a URL.", url=url)
 
     out_id = str(uuid.uuid4())
+    cookies_file = write_cookies_file()
 
     try:
         if "spotify.com" in url:
             # ── Spotify: use spotdl ──────────────────────────
-            result = subprocess.run(
-                [
+            cmd = [
                 "spotdl", url,
                 "--output", f"/tmp/{out_id}.{{title}}.mp3",
                 "--format", "mp3",
                 "--bitrate", "320k",
                 "--audio", "youtube",
-                ],
-                capture_output=True,
-                text=True
-            )
+            ]
+            if cookies_file:
+                cmd += ["--cookie-file", cookies_file]
 
-            # find the file spotdl created
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
             files = [f for f in os.listdir("/tmp") if f.startswith(out_id) and f.endswith(".mp3")]
             if not files:
-                error_msg = f"STDOUT: {result.stdout.strip()} | STDERR: {result.stderr.strip()}"
+                error_msg = result.stdout.strip() or result.stderr.strip() or "Download failed."
                 return render_template_string(HTML, error=error_msg, url=url)
 
             mp3_path = f"/tmp/{files[0]}"
@@ -236,6 +210,8 @@ def download():
                 }],
                 "quiet": True,
             }
+            if cookies_file:
+                ydl_opts["cookiefile"] = cookies_file
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
@@ -250,6 +226,10 @@ def download():
 
     except Exception as e:
         return render_template_string(HTML, error=str(e), url=url)
+
+    finally:
+        if cookies_file and os.path.exists(cookies_file):
+            os.unlink(cookies_file)
 
 
 if __name__ == "__main__":
