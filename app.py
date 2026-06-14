@@ -206,6 +206,8 @@ def download():
                     "--output", f"/tmp/{out_id}.{{title}}.mp3",
                     "--format", "mp3",
                     "--bitrate", "320k",
+                    "--audio", "youtube",
+                    "--lyrics-provider", "genius",
                 ],
                 capture_output=True,
                 text=True
