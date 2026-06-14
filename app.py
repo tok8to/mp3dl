@@ -12,7 +12,7 @@ HTML = """
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tokito MP3 Downloader</title>
+  <title>MP3 Downloader</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -146,7 +146,7 @@ HTML = """
       </svg>
     </div>
 
-    <h1>Tokito MP3 Downloader</h1>
+    <h1>MP3 Downloader</h1>
     <p class="sub">Paste a YouTube or Spotify link to download as MP3.</p>
 
     <form method="POST" action="/download" onsubmit="handleSubmit(this)">
@@ -256,4 +256,4 @@ def download():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"✓ MP3 Downloader running at http://localhost:{port}")
-    app.run(host="0.0.0.0", port=port, threaded=True)
+    app.run(host="0.0.0.0", port=port)
